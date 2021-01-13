@@ -196,7 +196,7 @@ OutRec 发送Bunch缓冲区，类型tcp的窗口大小
 InPartialBunch 接收分包Bunch缓冲区
 
 一个UNetConnection有个UChannel的数组，其中有两个Channel是固定的一个 UVoiceChannel 和 UControlChannel，然后其他剩下都是UActorChannel，我这样理解每个Actor都拥有自己的Channel，每个Actor处理自己的相关的网络包逻辑，不会混在一起<br>
-所有的Channel都存在 UNetConnection::OpenChannels中，但是一旦有网络活动时才会才会把活跃的Channel放到 UNetConnection::ChannelsToTick 中，一旦不活跃就会从ChannelsToTick删除
+所有的Channel都存在 UNetConnection::OpenChannels中，但是一旦有网络活动时才会才会把活跃的Channel放到 UNetConnection::ChannelsToTick 中，一旦不活跃就会从ChannelsToTick删除，活跃就是Bunch::bOpen，不活跃就是Bunch::bClose
 
 ### 发包、收包，丢包、乱序，重包？
 这些都通过UChannel来处理
@@ -205,7 +205,7 @@ InPartialBunch 接收分包Bunch缓冲区
 2) 处理包 没来一个FInBunch会通过 UChannel::ReceivedNextBunch 处理，
 - 如果不是一个分包 UChannel::ReceivedSequencedBunch
 3) 丢包 如果发现丢包，通过UNetConnection::ReceivedNak处理
-4) 乱序 无序的数据会仍在InRec队列中等待处理 UChannel::ReceivedNextBunch会处理合并包
+4) 乱序 无序的数据会仍在InRec队列中等待处理 UChannel::ReceivedNextBunch 会处理合并包
 5) 重包 如果InRec队列中已存在该包，那么丢弃，如果发过来的包ChSequence<=当前已经处理的InReliable的序列号，那么丢弃
 ```cassandraql
 // DataChannel.cpp
@@ -224,10 +224,10 @@ if ( Bunch.bReliable && Bunch.ChSequence <= InReliable[Bunch.ChIndex] )
 1) 拆包，上面有提过超过 MAX_SINGLE_BUNCH_SIZE_BITS 就会拆，然后放到OutRec等待发送就行
 2) 合并包，接收端发现如果Bunch.bPartial==1时，说明是个分包，如果bPartialInitial==1表示是第一个分包，如果bPartialFinal==1表示是最后一个分包<br>
 思考和疑问<br>
-假设一个包被拆成3个Bunch，如果接收端收到第一个和第三个，第二个没收到怎么处理，或者到的顺序是 132 || 321 || 312 || 213 || 231 怎么处理的没看明白<br>
-如果在同一个Channel里面有同时发了两个大包，都需要拆包，因为我看InPartialBunch只会处理同一个拆包<br>
+假设一个包被拆成3个Bunch，如果接收端收到第一个和第三个，第二个没收到怎么处理，或者到的顺序是 132 || 321 || 312 || 213 || 231 ，好像会丢弃所有的已经收到的分包，需要重传？<br>
+如果在同一个Channel里面有同时发了两个大包，都需要拆包，因为我看InPartialBunch只会处理同一个拆包，如果是错开收到了两个不同的拆包子包，好像会丢弃原来的包，需要重传？<br>
 
-### 命令测试
+### 命令测试 FPacketSimulationSettings
 1) Net pktLag=，模拟延迟，单位是毫秒
 2) Net PktLagVariance=300，在模拟延迟的基础上，再上下浮动300毫秒。加上这个就会出现移动瞬移卡顿的效果
 3) Net PKtLoss=，丢包，单位是百分比，Net PKtLoss=90就是90%会丢包，也会出现移动瞬移卡顿
