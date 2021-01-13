@@ -1,5 +1,5 @@
 # UE4 UDP握手详解
-基于4.25，整个握手通过StatelessConnectHandlerComponent完成（server&client端）
+基于4.25.3，整个握手通过StatelessConnectHandlerComponent完成（server&client端）
 
 ## 包头解析
 握手包头总共227个bit+1个bit终止符（29个字节）；
