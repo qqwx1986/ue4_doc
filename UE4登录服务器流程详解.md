@@ -22,5 +22,5 @@
 6. Client收到 NMT_Welcome 后发送 NMT_Netspeed 给 Server，并设置 bSuccessfullyConnected=true
  (1) UEngine::TickWorldTravel 在Check bSuccessfullyConnected==true 时，调用LoadMap加载地图， 如果加载成功成功发送 NMT_Join 给服务器
 7. Server收到 NMT_Join <br>
- (1) 调用SpawnPlayActor生成一个新的APlayerController赋值给UNetConnection::PlayerController，在调用SpawnPlayActor时会一次调用AGameModeBase::Login和AGameModeBase::PostLogin <br>
+ (1) 调用SpawnPlayActor生成一个新的APlayerController赋值给UNetConnection::PlayerController，初始化APlayerController过程中会调用APlayerController::PostInitializeComponents初始化APlayerState（Server端）这个是同步玩家状态用的，在调用SpawnPlayActor时会一次调用AGameModeBase::Login和AGameModeBase::PostLogin <br>
  (2) 设置 UNetConnection::ClientLoginState 为 EClientLoginState::ReceivedJoin <br>
