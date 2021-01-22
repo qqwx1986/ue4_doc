@@ -90,7 +90,7 @@ FGatheredReplicationActorLists& OutGatheredReplicationLists;
 #### 6. UNetConnection 好像和Rep没有关系，但是牵扯到上面的 FNetViewer 初始化，为了便于理解 <br>
 - 继承于 UPlayer ，UPlayer 中有个 PlayerController，我理解就是控制当前的Connection的 Cotroller <br>
 - OwningActor 拥有者，一般和上面UPlayer::PlayerController指向同一个值（遗留，没搞清楚不一般情况指向谁呢？）<br>
-- ViewTarget 看注释的意思我理解说的是 OwningActor 控制的 Actor，一般情况也是 UPlayer::PlayerController 同一个值（自己控制自己嘛），如果观战理解不是自己控制自己？<br>
+- ViewTarget 看注释的意思我理解说的是 OwningActor 控制的 Actor，一般情况也是 UPlayer::PlayerController 同一个值（自己控制自己嘛），如果观战，我的理解就是被观战者？<br>
   
   
 ## 官方自带的Node（策略）
@@ -101,18 +101,21 @@ FGatheredReplicationActorLists& OutGatheredReplicationLists;
   1. 整个 ReplicationActorList
   2. StreamingLevelCollection
   3. 基类中的 UReplicationGraphNode::AllChildNodes，递归Gather功能，基类中虽然有 AllChildNodes，但是实现了 TearDown等清理功能，没用实现Gather功能
-- 使用场景，作为基类，好像没用直接使用的
+- 使用场景，作为基类，好像没直接使用
 
 #### 2. UReplicationGraphNode_ActorListFrequencyBuckets 继承于 UReplicationGraphNode
-- NonStreamingCollection NonStreamingCollection列表，（挖个坑，Steaming和NonStreaming有啥区别）
-- StreamingLevelCollection Streaming列表
+- NonStreamingCollection NonStreamingCollection列表，（挖个坑，Steaming和NonStreaming有啥区别，我看到代码中取得是ULevel的名字，如果取得是空那么是NonStreaming）
+- StreamingLevelCollection StreamingLevel列表
 - Gather干了啥
+  1. 整个 StreamingLevelCollection
+  2. 当前帧数的取模 NonStreamingCollection[frame/num]
 - 使用场景
-  1.
+  1. 暂时没看到使用场景
 #### 3. UReplicationGraphNode_DynamicSpatialFrequency 继承于 UReplicationGraphNode_ActorList
 - Gather干了啥
+  1. 没用实现自己的Gather
 - 使用场景
-  1.
+  1. 
 #### 4. UReplicationGraphNode_ConnectionDormancyNode 继承于 UReplicationGraphNode_ActorList
 - Gather干了啥
 - 使用场景
