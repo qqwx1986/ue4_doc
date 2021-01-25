@@ -56,9 +56,10 @@
 /** 保存当前的Connection **/
 UNetConnection* Connection;
 /** The "controlling net object" associated with this view (typically player controller) */
-/** **/
+/** 代码逻辑是 如果 UNetConnection::PlayerController不为空那么就是PlayerController，如果为空就是 UNetConnection::OwningActor **/
 class AActor* InViewer;
 /** The actor that is being directly viewed, usually a pawn.  Could also be the net actor of consequence */
+/** 就是 UNetConnection::ViewTarget  **/
 class AActor* ViewTarget;
 /** Where the viewer is looking from */
 FVector ViewLocation;
@@ -90,54 +91,102 @@ FGatheredReplicationActorLists& OutGatheredReplicationLists;
 #### 6. UNetConnection 好像和Rep没有关系，但是牵扯到上面的 FNetViewer 初始化，为了便于理解 <br>
 - 继承于 UPlayer ，UPlayer 中有个 PlayerController，我理解就是控制当前的Connection的 Cotroller <br>
 - OwningActor 拥有者，一般和上面UPlayer::PlayerController指向同一个值（遗留，没搞清楚不一般情况指向谁呢？）<br>
-- ViewTarget 看注释的意思我理解说的是 OwningActor 控制的 Actor，一般情况也是 UPlayer::PlayerController 同一个值（自己控制自己嘛），如果观战，我的理解就是被观战者？<br>
+- ViewTarget 看注释的意思我理解说的是 OwningActor 控制的 Actor，一般情况也是 UPlayer::PlayerController 同一个值（自己控制自己嘛），如果观战，我的理解这个值就是被观战者的OwingActor？<br>
   
   
 ## 官方自带的Node（策略）
 #### 1. UReplicationGraphNode_ActorList 继承于 UReplicationGraphNode
-- ReplicationActorList 保存了一组需要Rep 的 Actor 列表
-- StreamingLevelCollection 类型为  TArray<FStreamingLevelActors>，我看实现本质是个 TArray<FStreamingLevelActors>，其中FStreamingLevelActors，记录了一个StreamingLevelName，（挖个坑，这个暂时没看明白干嘛的）
+- 部分变量说明
+  1. ReplicationActorList 保存了一组需要Rep 的 Actor 列表
+  2. StreamingLevelCollection 类型为  TArray<FStreamingLevelActors>，我看实现本质是个 TArray<FStreamingLevelActors>，其中FStreamingLevelActors，记录了一个StreamingLevelName，（挖个坑，这个暂时没看明白干嘛的）
 - Gather干了啥
-  1. 整个 ReplicationActorList
-  2. StreamingLevelCollection
-  3. 基类中的 UReplicationGraphNode::AllChildNodes，递归Gather功能，基类中虽然有 AllChildNodes，但是实现了 TearDown等清理功能，没用实现Gather功能
+  1. 整个 ReplicationActorList（本质是个 Actor* 的数组）
+  2. StreamingLevelCollection判断对于Connection的可见性，可见的才会Gather
+  3. 基类中的 UReplicationGraphNode::AllChildNodes，递归Gather功能，基类中虽然有 AllChildNodes，但是实现了 TearDown等清理功能，没有实现Gather功能
 - 使用场景，作为基类，好像没直接使用
 
 #### 2. UReplicationGraphNode_ActorListFrequencyBuckets 继承于 UReplicationGraphNode
-- NonStreamingCollection NonStreamingCollection列表，（挖个坑，Steaming和NonStreaming有啥区别，我看到代码中取得是ULevel的名字，如果取得是空那么是NonStreaming）
-- StreamingLevelCollection StreamingLevel列表
+- 部分变量说明
+  1. NonStreamingCollection NonStreamingCollection列表，（挖个坑，Steaming和NonStreaming有啥区别，我看到代码中取得是ULevel的名字，如果取得是空那么是NonStreaming）
+  2. StreamingLevelCollection StreamingLevel列表
 - Gather干了啥
-  1. 整个 StreamingLevelCollection
+  1. StreamingLevelCollection判断对于Connection的可见性，可见的才会Gather
   2. 当前帧数的取模 NonStreamingCollection[frame/num]
 - 使用场景
   1. 暂时没看到使用场景
+  
 #### 3. UReplicationGraphNode_DynamicSpatialFrequency 继承于 UReplicationGraphNode_ActorList
 - Gather干了啥
-  1. 没用实现自己的Gather
+  1. 没有实现自己的Gather，用的基类的Gather
 - 使用场景
-  1. 
+  1. 暂时没看到使用场景
+  
 #### 4. UReplicationGraphNode_ConnectionDormancyNode 继承于 UReplicationGraphNode_ActorList
 - Gather干了啥
+  1. 从 ReplicationActorList 删除 bDormantOnConnection 的 Actor，ReplicationActorList 剩下的Add进入 OutGatheredReplicationLists 中
+  2. 从 StreamingLevelCollection 删除 bDormantOnConnection 的SteamingLevelActor ， StreamingLevelCollection 剩下的 Add 进 OutGatheredReplicationLists 中，其中删除的会缓存到RemovedStreamingLevelActorListCollection 
 - 使用场景
-  1.
+  1. UReplicationGraphNode_DormancyNode 存了 UNetReplicationGraphConnection 到 UReplicationGraphNode_ConnectionDormancyNode 的映射
+  
 #### 5. UReplicationGraphNode_DormancyNode 继承于 UReplicationGraphNode_ActorList
 - Gather干了啥
+  1. 获取当前Connection的UReplicationGraphNode_ConnectionDormancyNode，然后Gather
 - 使用场景
-  1.
+  1. UReplicationGraphNode_GridCell 中使用
+  
 #### 6. UReplicationGraphNode_GridCell 继承于 UReplicationGraphNode_ActorList
+- 部分变量说明
+  1. CreateDynamicNodeOverride 这是个创建DynamicNode的function，可以自己定制
+  2. DynamicNode 动态Node，如果CreateDynamicNodeOverride不为空，那么CreateDynamicNodeOverride创建，否则就是个 UReplicationGraphNode_ActorListFrequencyBuckets
+  3. DormancyNode 类型为 UReplicationGraphNode_DormancyNode
 - Gather干了啥
+  1. 没有实现自己的Gather，用的基类的Gather
 - 使用场景
-  1.
+  1. UReplicationGraphNode_GridSpatialization2D使用，类似九宫格的格子
+  
 #### 7. UReplicationGraphNode_GridSpatialization2D 继承于 UReplicationGraphNode_ActorList
+- 部分变量说明
+  1. CellSize 格子大小
+  2. SpatialBias 空间偏移
+  3. bDestroyDormantDynamicActors  (When enabled the RepGraph tells clients to destroy dormant dynamic actors when they go out of relevancy)
+  4. CreateCellNodeOverride 创建 UReplicationGraphNode_GridCell 的function, 就是可以自定义 GridCell，如果为空那就是用默认的
+  5. DynamicSpatializedActors 动态Actors
+  6. StaticSpatializedActors pending静态Actors
+  7. PendingStaticSpatializedActors 静态Actors
+  8. Grid 二维格子数组
+  9. GatheredNodes Gather用的缓存TArray，可能为了效率吧
 - Gather干了啥
+  1. 
 - 使用场景
-  1.
+  1. 基本都可以用上，可以自己定制
+  
 #### 8. UReplicationGraphNode_AlwaysRelevant 继承于 UReplicationGraphNode
+- 部分变量说明
+  1. ChildNode 类型是UReplicationGraphNode_ActorList
+  2. AlwaysRelevantClasses AlwaysRelevant Class列表，显示调用AddAlwaysRelevantClass插入
 - Gather干了啥
+  1. Gather ChildNode
 - 使用场景
-  1.
+  1. 暂时没看到使用场景
+  
 #### 9. UReplicationGraphNode_AlwaysRelevant_ForConnection 继承于 UReplicationGraphNode_ActorList
+- 部分变量说明
+  1. ReplicationActorList
+  2. PastRelevantActors
 - Gather干了啥
+  1. 调用基类 UReplicationGraphNode_ActorList 的Gather
+  2. ReplicationActorList 重置 Reset 为空
+  3. 最终我看就是Conection的 PlayerController 和 ViewTarget
 - 使用场景
-  1.
+  1. 暂时没看到使用场景
+  
 #### 10. UReplicationGraphNode_TearOff_ForConnection 继承于 UReplicationGraphNode
+- 部分变量说明
+  1. TearOffActors 记录了所有 TearOff 状态的 Actor，当加入该队列时，会通知相应的Channel下一次Rep时关闭
+  2. ReplicationActorList
+- Gather干了啥
+  1. 如果TearOffActors.Num()==0 啥也不干 
+  2. 倒序遍历（倒序是为了下面删除的时候效率高，因为是个数组）TearOffActors，保证置成TearOff状态的Actor会Rep一次，状态判定成功的逻辑，放到ReplicationActorList中
+  3. Gather 整个 ReplicationActorList
+- 使用场景
+  1. 每个 UNetReplicationGraphConnection 会有一个 UReplicationGraphNode_TearOff_ForConnection
