@@ -41,9 +41,9 @@
 - UReplicationGraph::ReplicateActorListsForConnections_Default 发送Actors的相关同步信息 <br>
     1. 遍历 Gather 的Actors列表 <br>
     2. 从 GlobalActorReplicationInfoMap 获取Actor的Rep信息，ReadyForNextReplication 判断这一帧是否需要同步<br>
-    3. 根据上面的GlobalActorRep信息算出优先级（TODO: 具体怎么算的，后面有时间再看补上文档） AccumulatedPriority 放到 UReplicationGraph::PrioritizedReplicationList 中，然后根据优先级排序 <br>
+    3. 根据上面的 GlobalActorRep 配置信息算出优先级（TODO: 具体怎么算的，后面有时间再看补上文档） AccumulatedPriority 放到 UReplicationGraph::PrioritizedReplicationList 中，然后根据优先级排序 <br>
     4. 遍历 PrioritizedReplicationList，调用 UReplicationGraph::ReplicateSingleActor
-    5. 调用 AActor::CallPreReplication，会遍历该Actor下的所有 ReplicatedComponents并调用PreReplication
+    5. 调用 AActor::CallPreReplication，会遍历该Actor下的所有 ReplicatedComponents 并调用 PreReplication
     6. 调用 UActorChannel::ReplicateActor <br>
     7. 调用 UActorChannel::ActorReplicator 的 ReplicateProperties(TODO:这里面涉及到FReplicationFlags，后面有时间再看补上文档) 把需要该Actor的同步的数据写入Bunch <br>
     8. 调用 AActor::ReplicateSubobjects 写入Actor的子对象 ReplicatedComponents，遍历子对象 ReplicatedComponents并分别调用子对象的 ReplicateSubobjects（TODO:怎么序列号到Bunch中的这一块也能写一大篇了） <br>
@@ -140,7 +140,7 @@ FGatheredReplicationActorLists& OutGatheredReplicationLists;
   2. DynamicNode 动态Node，如果CreateDynamicNodeOverride不为空，那么CreateDynamicNodeOverride创建，否则就是个 UReplicationGraphNode_ActorListFrequencyBuckets
   3. DormancyNode 类型为 UReplicationGraphNode_DormancyNode
 - Gather干了啥
-  1. 没有实现自己的Gather，用的基类的Gather
+  1. 没有实现自己的Gather，用的基类的Gather，所以这里的Gather没有用到上面的 DynamicNode 和 DormancyNode
 - 使用场景
   1. UReplicationGraphNode_GridSpatialization2D使用，类似九宫格的格子
   
@@ -155,8 +155,19 @@ FGatheredReplicationActorLists& OutGatheredReplicationLists;
   7. PendingStaticSpatializedActors 静态Actors
   8. Grid 二维格子数组
   9. GatheredNodes Gather用的缓存TArray，可能为了效率吧
+- PrepareForReplication 干了啥（这个会在Gather之前调用）
+  1. 遍历 DynamicSpatializedActors
+  2. 获取 Actor 当前的 NewCellInfo
+  3. 比对计算 Actor 的 PreCellInfo 和 NewCellInfo（其实就是看动了没，如果动了是不是跨Grid了），<br>
+     这里有个地方需要特别理解，和传统有点思路有点不一样，这边会调用 UReplicationGraphNode_GridSpatialization2D::GetCellInfoForActor 根据配置参数（FClassReplicationInfo::CullDistance 视距？ CellSize）算出次Actor的相关Grids，我理解就是我可能被别人看到的几个相关Grid<br>
+     然后计算 OldCellGrids 调用RemoveDynamicActor，遍历 NewCellGrids 调用 AddDynamicActor加入，我这边理解就是同一个Actor可能会放在不同的CellGrid中 <br>
+     PreCellInfo 更新为 NewCellInfo <br>
+  4. 遍历 PendingStaticSpatializedActors 中的 Actor 放入到 StaticSpatializedActors 中，并从PendingStaticSpatializedActors删除
 - Gather干了啥
-  1. 
+  1. 获取当前Connection的 CellGrid ,Gather 当前的 CellGrid，上面 Prepare 已经说明了和这个CellGrid的Actor已经放进来了（及时坐标不在这个CellGrid内）
+  2. 如果 bDestroyDormantDynamicActors 为 true，那么 Connection的 PreCell 的 Actor 放到 PrevDormantActorList 列表中<br>
+     遍历 PrevDormantActorList，加入到当前GraphConnection 的 PendingDormantDestructList 中，<br>
+     这个会在调用 UReplicationGraph::ServerReplicateActors 时会调用  UNetReplicationGraphConnection::ReplicateDormantDestructionInfos 同步给 ConnectClient
 - 使用场景
   1. 基本都可以用上，可以自己定制
   
@@ -178,7 +189,7 @@ FGatheredReplicationActorLists& OutGatheredReplicationLists;
   2. ReplicationActorList 重置 Reset 为空
   3. 最终我看就是Conection的 PlayerController 和 ViewTarget
 - 使用场景
-  1. 暂时没看到使用场景
+  1. 暂时没看到使用场景，类似倒计时、毒圈可以用这个做吧
   
 #### 10. UReplicationGraphNode_TearOff_ForConnection 继承于 UReplicationGraphNode
 - 部分变量说明
