@@ -3,7 +3,7 @@
 ## 基础类
 1. UReplicationDriver 驱动，这个是个接口类，Graph需要继承于该类
 2. UReplicationGraph 管理Actor的同步，一个World只有一个，自己实现一般是继承于该类
-3. UReplicationGraphNode 我这边理解Driver的（策略）Node，可以自定义，Driver中存了全局的Node（针对所有的连接有效），然后Connect有自己特有的Node
+3. UReplicationGraphNode 我这边理解Driver的（同步策略）Node，可以自定义，Driver中存了全局的Node（针对所有的连接有效），然后Connect有自己特有的Node
 4. UReplicationConnectionDriver，这是接口 连接的 RepGraph 驱动，每个Connect有一个自己的Driver
 5. UNetReplicationGraphConnection 继承于UReplicationConnectionDriver，项目可以继承这个再实现自己的Driver
 
