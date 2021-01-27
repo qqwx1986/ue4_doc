@@ -10,45 +10,52 @@
 ## Driver初始化流程
 #### 1. UNetDriver::InitBase 时会New一个UReplicationDriver，这个配置在 DefaultEngine.ini 里面的配置选项 [/Script/OnlineSubsystemUtils.IpNetDriver] ReplicationDriverClassName
 #### 2. UNetDriver::SetReplicationDriver 
-- 如果老的Driver存在，那么会调用TearDown卸载原来的Driver，然后存在的Conection会调用 UNetConnection::TearDownReplicationConnectionDriver卸载连接的ReplicationConnectDriver <br>
-- 调用 UReplicationGraph::SetRepDriverWorld 设置当前的World <br>
-- 调用 UReplicationGraph::InitForNetDriver 初始化 <br>
-    1. UReplicationGraph::InitGlobalActorClassSettings 设置Actor相关的Rep信息 <br>
-        设置Actor的多播开关 UReplicationGraph::RPC_Multicast_OpenChannelForClass，<br>
-        设置全局各个Actor类的FClassReplicationInfo信息，在UReplicationGraph::GlobalActorReplicationInfoMap，<br>
-        设置Actor Rep的最大举例 UReplicationGraph::DestructInfoMaxDistanceSquared <br>
-    2. UReplicationGraph::InitGlobalGraphNodes 预设值RepList分配池子，加入自定义的GraphNode <br>
-    3. 循环 UNetDriver的Connect 加入到GraphDriver中 UReplicationGraph::AddClientConnection <br>
-- UReplicationGraph::InitializeActorsInWorld <br>
-    1. UReplicationGraph 中所有的Node调用 UReplicationGraphNode::NotifyResetAllNetworkActors <br>
-    2. UReplicationGraph 中所有的连接调用 UNetReplicationGraphConnection::NotifyResetAllNetworkActors <br>
-    3. 遍历World中全局所有的Actor，如果ULevel::IsNetActor，调用UReplicationGraph::AddNetworkActor <br>
-       判定Actor::bReplicates 如果为真加入 UReplicationGraph::ActiveNetworkActors 记录了Graph中有哪些Actor在参与，纯粹一个记录 <br>
-       加入 GUReplicationGraph::GlobalActorReplicationInfoMap 这个在上面有提过 <br>
-       UReplicationGraph::RouteAddNetworkActorToNodes 遍历 GlobalGraphNodes ，调用 NotifyAddNetworkActor 通知有新的Actor加入 <br>
-#### 3. 每当有个新的连接握手完成调用 UNetDriver::AddClientConnection <br>
+- 如果老的Driver存在，那么会调用TearDown卸载原来的Driver，然后存在的Conection会调用 UNetConnection::TearDownReplicationConnectionDriver卸载连接的ReplicationConnectDriver 
+- 调用 UReplicationGraph::SetRepDriverWorld 设置当前的World 
+- 调用 UReplicationGraph::InitForNetDriver 初始化
+  1. UReplicationGraph::InitGlobalActorClassSettings 设置Actor相关的Rep信息 <br>
+      设置Actor的多播开关 UReplicationGraph::RPC_Multicast_OpenChannelForClass，<br>
+      设置全局各个Actor类的FClassReplicationInfo信息，在UReplicationGraph::GlobalActorReplicationInfoMap，<br>
+      设置Actor Rep的最大举例 UReplicationGraph::DestructInfoMaxDistanceSquared 
+  2. UReplicationGraph::InitGlobalGraphNodes 预设值RepList分配池子，加入自定义的GraphNode 
+  3. 循环 UNetDriver的Connect 加入到GraphDriver中 UReplicationGraph::AddClientConnection 
+- UReplicationGraph::InitializeActorsInWorld
+  1. UReplicationGraph 中所有的Node调用 UReplicationGraphNode::NotifyResetAllNetworkActors
+  2. UReplicationGraph 中所有的连接调用 UNetReplicationGraphConnection::NotifyResetAllNetworkActors 
+  3. 遍历World中全局所有的Actor，如果ULevel::IsNetActor，调用UReplicationGraph::AddNetworkActor 
+     判定Actor::bReplicates 如果为真加入 UReplicationGraph::ActiveNetworkActors 记录了Graph中有哪些Actor在参与，纯粹一个记录 
+     加入 GUReplicationGraph::GlobalActorReplicationInfoMap 这个在上面有提过
+     UReplicationGraph::RouteAddNetworkActorToNodes 遍历 GlobalGraphNodes ，调用 NotifyAddNetworkActor 通知有新的Actor加入
+#### 3. 每当有个新的连接握手完成调用 UNetDriver::AddClientConnection 
 - UReplicationGraph::AddClientConnection 加入Connect 到 UReplicationGraph::Connections 中
-- 在调用 UReplicationGraph::CreateClientConnectionManagerInternal 创建一个新的 UNetReplicationGraphConnection 时，<br>
-    1. 会依次调用 UNetReplicationGraphConnection::InitForGraph，<br>
-    2. UNetReplicationGraphConnection::InitForConnection，<br>
-    3. UReplicationGraph::InitConnectionGraphNodes，这里可以加入自定义的Node到 UNetReplicationGraphConnection::ConnectionGraphNodes 中，并注册ClientLevelVisible相关事件委托 <>
-    4. UNetDriver::TickFlush 时会调用到 UReplicationGraph::ServerReplicateActors <br>
-- 遍历 UReplicationGraph::PrepareForReplicationNodes 调用 UReplicationGraphNode::PrepareForReplication <br>
-- 遍历 UReplicationGraph::Connections 的每个Connect <br>
-- 首先会发送movement的消息，这个是不想受到流控影响？ <br>
-- 遍历全局GlobalGraphNodes的 GatherActorListsForConnection 到 FConnectionGatherActorListParameters中 <br>
-- 遍历 Connect 自己的 GatherActorListsForConnection <br>
-- UReplicationGraph::ReplicateActorListsForConnections_Default 发送Actors的相关同步信息 <br>
-    1. 遍历 Gather 的Actors列表 <br>
-    2. 从 GlobalActorReplicationInfoMap 获取Actor的Rep信息，ReadyForNextReplication 判断这一帧是否需要同步<br>
-    3. 根据上面的 GlobalActorRep 配置信息算出优先级（TODO: 具体怎么算的，后面有时间再看补上文档） AccumulatedPriority 放到 UReplicationGraph::PrioritizedReplicationList 中，然后根据优先级排序 <br>
-    4. 遍历 PrioritizedReplicationList，调用 UReplicationGraph::ReplicateSingleActor
-    5. 调用 AActor::CallPreReplication，会遍历该Actor下的所有 ReplicatedComponents 并调用 PreReplication
-    6. 调用 UActorChannel::ReplicateActor <br>
-    7. 调用 UActorChannel::ActorReplicator 的 ReplicateProperties(TODO:这里面涉及到FReplicationFlags，后面有时间再看补上文档) 把需要该Actor的同步的数据写入Bunch <br>
-    8. 调用 AActor::ReplicateSubobjects 写入Actor的子对象 ReplicatedComponents，遍历子对象 ReplicatedComponents并分别调用子对象的 ReplicateSubobjects（TODO:怎么序列号到Bunch中的这一块也能写一大篇了） <br>
-    9. 调用 UChannel::SendBunch —> UChannel::SendRawBunch -> UNetConnection::SendRawBunch 这个在[可靠性详解]中有说Bunch的发送过程 <br>
-- UReplicationGraph::ReplicateActorListsForConnections_FastShared 这个是快速发送,没看明白，好像没看使用的地方，先不管 <br>
+- 在调用 UReplicationGraph::CreateClientConnectionManagerInternal 创建一个新的 UNetReplicationGraphConnection 时
+  1. 会依次调用 UNetReplicationGraphConnection::InitForGraph
+  2. UNetReplicationGraphConnection::InitForConnection
+  3. UReplicationGraph::InitConnectionGraphNodes，这里可以加入自定义的Node到 UNetReplicationGraphConnection::ConnectionGraphNodes 中，并注册ClientLevelVisible相关事件委托
+  4. UNetDriver::TickFlush 时会调用到 UReplicationGraph::ServerReplicateActors 
+- 遍历 UReplicationGraph::PrepareForReplicationNodes 调用 UReplicationGraphNode::PrepareForReplication 
+- 遍历 UReplicationGraph::Connections 的每个Connect 
+- 首先会发送movement的消息，这个是不想受到流控影响？
+- 遍历全局GlobalGraphNodes的 GatherActorListsForConnection 到 FConnectionGatherActorListParameters中 
+- 遍历 Connect 自己的 GatherActorListsForConnection 
+- UReplicationGraph::ReplicateActorListsForConnections_Default 发送Actors的相关同步信息 
+  1. 遍历 Gather 的 Actors Default 列表
+  2. 从 GlobalActorReplicationInfoMap 获取Actor的Rep信息，ReadyForNextReplication 判断这一帧是否需要同步
+  3. 根据上面的 GlobalActorRep 配置信息算出优先级（TODO: 具体怎么算的，后面有时间再看补上文档） AccumulatedPriority 放到 UReplicationGraph::PrioritizedReplicationList 中，然后根据优先级排序 <br>
+  4. 遍历 PrioritizedReplicationList，调用 UReplicationGraph::ReplicateSingleActor
+  5. 调用 AActor::CallPreReplication，会遍历该Actor下的所有 ReplicatedComponents 并调用 PreReplication
+  6. 调用 UActorChannel::ReplicateActor
+  7. 调用 UActorChannel::ActorReplicator 的 ReplicateProperties(TODO:这里面涉及到FReplicationFlags，后面有时间再看补上文档) 把需要该Actor的同步的数据写入Bunch 
+  8. 调用 AActor::ReplicateSubobjects 写入Actor的子对象 ReplicatedComponents，遍历子对象 ReplicatedComponents并分别调用子对象的 ReplicateSubobjects（TODO:怎么序列号到Bunch中的这一块也能写一大篇了）
+  9. 调用 UChannel::SendBunch —> UChannel::SendRawBunch -> UNetConnection::SendRawBunch 这个在[可靠性详解]中有说Bunch的发送过程 
+- UReplicationGraph::ReplicateActorListsForConnections_FastShared 这个是快速发送（少了个CallPreReplication所以快？）, 目前就看到 UReplicationGraphNode_ActorListFrequencyBuckets 使用了
+  1. 遍历 Gather 的 Actors FastShared 列表
+  2. 调用 UReplicationGraph::ReplicateSingleActor_FastShared
+  3. Bunch 用的是 FFastSharedReplicationInfo::Bunch 引用
+  4. 调用 FClassReplicationInfo::FastSharedReplicationFunc（但是没看到这个的默认Func实现） 序列号数据到 FFastSharedReplicationInfo::Bunch 中
+  5. SendBunch Merge是0，所以快？
+  6. 感觉这个好像这个版本没用
+  
 ## 辅助类
 #### 1. FClassReplicationInfo Actor类的Rep配置信息，距离，饥饿（距离上次rep的帧数）等
 #### 2. FNetViewer  
@@ -101,7 +108,7 @@ FGatheredReplicationActorLists& OutGatheredReplicationLists;
   2. StreamingLevelCollection 类型为  TArray<FStreamingLevelActors>，我看实现本质是个 TArray<FStreamingLevelActors>，其中FStreamingLevelActors，记录了一个StreamingLevelName，（挖个坑，这个暂时没看明白干嘛的）
 - Gather干了啥
   1. 整个 ReplicationActorList（本质是个 Actor* 的数组）
-  2. StreamingLevelCollection判断对于Connection的可见性，可见的才会Gather
+  2. StreamingLevelCollection 判断对于Connection的可见/相关性，可见的才会Gather，只会Gather(相关/可见)性Level中的Actors
   3. 基类中的 UReplicationGraphNode::AllChildNodes，递归Gather功能，基类中虽然有 AllChildNodes，但是实现了 TearDown等清理功能，没有实现Gather功能
 - 使用场景，作为基类，好像没直接使用
 
@@ -110,10 +117,10 @@ FGatheredReplicationActorLists& OutGatheredReplicationLists;
   1. NonStreamingCollection NonStreamingCollection列表，（挖个坑，Steaming和NonStreaming有啥区别，我看到代码中取得是ULevel的名字，如果取得是空那么是NonStreaming）
   2. StreamingLevelCollection StreamingLevel列表
 - Gather干了啥
-  1. StreamingLevelCollection判断对于Connection的可见性，可见的才会Gather
+  1. StreamingLevelCollection 判断对于Connection的可见/相关性，可见的才会Gather，只会Gather(相关/可见)性Level中的Actors
   2. 当前帧数的取模 NonStreamingCollection[frame/num]
 - 使用场景
-  1. 暂时没看到使用场景
+  1. UReplicationGraphNode_GridCell 中在用
   
 #### 3. UReplicationGraphNode_DynamicSpatialFrequency 继承于 UReplicationGraphNode_ActorList
 - Gather干了啥
@@ -201,3 +208,4 @@ FGatheredReplicationActorLists& OutGatheredReplicationLists;
   3. Gather 整个 ReplicationActorList
 - 使用场景
   1. 每个 UNetReplicationGraphConnection 会有一个 UReplicationGraphNode_TearOff_ForConnection
+
