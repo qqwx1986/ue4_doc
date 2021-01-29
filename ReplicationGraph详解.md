@@ -32,7 +32,7 @@
   1. 会依次调用 UNetReplicationGraphConnection::InitForGraph
   2. UNetReplicationGraphConnection::InitForConnection
   3. UReplicationGraph::InitConnectionGraphNodes，这里可以加入自定义的Node到 UNetReplicationGraphConnection::ConnectionGraphNodes 中，并注册ClientLevelVisible相关事件委托
-- UNetDriver::TickFlush 时会调用到 UReplicationGraph::ServerReplicateActors [官方文档说明](https://docs.unrealengine.com/en-US/InteractiveExperiences/Networking/Actors/ReplicationFlow/index.html)
+- UNetDriver::TickFlush 时会调用到 UReplicationGraph::ServerReplicateActors ，可以部分参考[官方文档说明](https://docs.unrealengine.com/en-US/InteractiveExperiences/Networking/Actors/ReplicationFlow/index.html)，里面有部分有理解价值，但是里面流程大部分还是之前非ReplicationGraph的同步方式
 - 遍历 UReplicationGraph::PrepareForReplicationNodes 调用 UReplicationGraphNode::PrepareForReplication 
 - 遍历 UReplicationGraph::Connections 的每个Connect 
 - 首先会发送movement的消息，这个是不想受到流控影响？
