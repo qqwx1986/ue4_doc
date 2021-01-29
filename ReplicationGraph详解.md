@@ -44,7 +44,7 @@
   3. 根据上面的 GlobalActorRep 配置信息算出优先级（TODO: 具体怎么算的，后面有时间再看补上文档） AccumulatedPriority 放到 UReplicationGraph::PrioritizedReplicationList 中，然后根据优先级排序 <br>
   4. 遍历 PrioritizedReplicationList，调用 UReplicationGraph::ReplicateSingleActor
   5. 调用 AActor::CallPreReplication，会遍历该Actor下的所有 ReplicatedComponents 并调用 PreReplication
-  6. 调用 UActorChannel::ReplicateActor
+  6. 调用 UActorChannel::ReplicateActor [官方文档说明](https://docs.unrealengine.com/en-US/InteractiveExperiences/Networking/Actors/ReplicationFlow/index.html)
   7. 调用 UActorChannel::ActorReplicator 的 ReplicateProperties(TODO:这里面涉及到FReplicationFlags，后面有时间再看补上文档) 把需要该Actor的同步的数据写入Bunch 
   8. 调用 AActor::ReplicateSubobjects 写入Actor的子对象 ReplicatedComponents，遍历子对象 ReplicatedComponents并分别调用子对象的 ReplicateSubobjects（TODO:怎么序列号到Bunch中的这一块也能写一大篇了）
   9. 调用 UChannel::SendBunch —> UChannel::SendRawBunch -> UNetConnection::SendRawBunch 这个在[可靠性详解]中有说Bunch的发送过程 
