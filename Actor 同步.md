@@ -27,7 +27,8 @@ TSharedPtr<FObjectReplicator> UNetConnection::CreateReplicatorForNewActorChannel
 	NewReplicator->InitWithObject( Object, this, true );
 	return NewReplicator;
 }
-
+// FObjectReplicator 管理了FRepLayout 和 FReplicationChangelistMg
+// FReplicationChangelistMgr 涉及到历史shadow数据
 void FObjectReplicator::InitWithObject( UObject* InObject, UNetConnection * InConnection, bool bUseDefaultState )
 {
     // .....
