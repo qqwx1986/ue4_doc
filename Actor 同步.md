@@ -47,7 +47,7 @@ void FObjectReplicator::InitWithObject( UObject* InObject, UNetConnection * InCo
 ```
 我这边看了下，整个Actor的同步涉及代码还是非常复杂的，这边先找到入口，具体还是需要看代码 <br>
 FRepLayout 这个辅助类是做属性的脏数据的比较和历史同步数据之类的 <br>
-FRepLayout::CompareProperties 比对是否有差异 <br>
+FRepLayout::CompareProperties 比对是否有差异，需要同步的数据会有一份shadow数据，每次会与shadow数据比对变动的内容 <br>
 FRepLayout::SendProperties 提取并发送差异 <br>
 FRepLayout::BuildSharedSerialization 可共享的序列化数据 <br>
 属性类型的 TArray 会特殊处理，不过本质就是递归调用 <br>
