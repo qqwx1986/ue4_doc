@@ -31,7 +31,7 @@ TSharedPtr<FObjectReplicator> UNetConnection::CreateReplicatorForNewActorChannel
 void FObjectReplicator::InitWithObject( UObject* InObject, UNetConnection * InConnection, bool bUseDefaultState )
 {
     // .....
-    // 保存反射信息
+    // 保存反射信息，这里就是UClass，因为记录属性的本质就是保存了对象地址的偏移量
 	ObjectClass					= InObject->GetClass(); 
 
     // 生成 FRepLayout 这个是同步的核心
@@ -45,7 +45,8 @@ void FObjectReplicator::InitWithObject( UObject* InObject, UNetConnection * InCo
 	Connection->Driver->AllOwnedReplicators.Add(this);
 }
 ```
-FRepLayout 这个辅助类是做脏数据的比较和历史同步数据之类的，这个实现特别复杂，这边先大概找到入口 <br>
+我这边看了下，整个Actor的同步涉及代码还是非常复杂的，这边先找到入口，具体还是需要看代码 <br>
+FRepLayout 这个辅助类是做属性的脏数据的比较和历史同步数据之类的 <br>
 FRepLayout::CompareProperties 比对是否有差异 <br>
 FRepLayout::SendProperties 提取并发送差异 <br>
 FRepLayout::BuildSharedSerialization 可共享的序列化数据 <br>
