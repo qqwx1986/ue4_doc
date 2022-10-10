@@ -8,7 +8,7 @@
 
 Post Process Materials
 
-数组添加描边材质
+数组Array添加描边材质
 
 Infinite Extent 勾上
 
